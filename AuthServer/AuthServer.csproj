@@ -16,6 +16,8 @@
     <PackageReference Include="OpenIddict" Version="5.3.0" />
     <PackageReference Include="OpenIddict.AspNetCore" Version="5.3.0" />
     <PackageReference Include="OpenIddict.EntityFrameworkCore" Version="5.3.0" />
+    <PackageReference Include="Serilog.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
   </ItemGroup>
 
 </Project>

@@ -5,4 +5,7 @@
 /.vs
 /AuthServer/.vs/AuthServer
 /AuthServer/bin/Debug/net6.0
+/AuthServer/bin/Release/net6.0
 /AuthServer/obj
+/AuthServer/logs
+/AuthServer/Properties/PublishProfiles

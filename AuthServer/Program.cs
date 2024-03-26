@@ -1,7 +1,7 @@
 using AuthServer;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,7 +19,6 @@ builder.Services.AddDbContext<DbContext>(options =>
     // Register the entity sets needed by OpenIddict.
     options.UseOpenIddict();
 });
-
 /*builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
     // Configure the Entity Framework Core to use Microsoft SQL Server.
@@ -28,6 +27,13 @@ builder.Services.AddDbContext<DbContext>(options =>
     // Register the entity sets needed by OpenIddict.
     options.UseOpenIddict();
 });*/
+
+var logger = new LoggerConfiguration()
+.MinimumLevel.Debug()
+.WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
+.CreateLogger();
+builder.Logging.ClearProviders();
+builder.Logging.AddSerilog(logger);
 
 builder.Services.AddOpenIddict()
 
@@ -89,7 +95,11 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+if (app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseStaticFiles();
 
 app.UseRouting();
@@ -97,6 +107,8 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.UseAuthentication();
+
+
 
 //app.MapRazorPages();
 //app.MapDefaultControllerRoute();
