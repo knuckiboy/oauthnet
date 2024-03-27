@@ -4,6 +4,9 @@ using Microsoft.EntityFrameworkCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+// Configuration Setup
+var configuration = builder.Configuration;
+
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
@@ -28,6 +31,7 @@ builder.Services.AddDbContext<DbContext>(options =>
     options.UseOpenIddict();
 });*/
 
+//Logging Configuration
 var logger = new LoggerConfiguration()
 .MinimumLevel.Debug()
 .WriteTo.File("logs/log-.txt", rollingInterval: RollingInterval.Day)
@@ -59,10 +63,9 @@ builder.Services.AddOpenIddict()
                 .AllowClientCredentialsFlow();
             options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange();
 
-
             options
-            .SetAuthorizationEndpointUris("/connect/authorize")
-                .SetTokenEndpointUris("/connect/token");
+            .SetAuthorizationEndpointUris(configuration.GetSection("OpenIddict:AuthorizationEndpointUrls").Get<string[]>())
+                .SetTokenEndpointUris(configuration.GetSection("OpenIddict:TokenEndpointUrls").Get<string[]>());
 
             // Encryption and signing of tokens
             options
@@ -81,6 +84,14 @@ builder.Services.AddOpenIddict()
                 .AddEphemeralEncryptionKey()
                 .AddEphemeralSigningKey()
                 .DisableAccessTokenEncryption();
+
+            // Production Configuration
+            if (configuration.GetSection("OpenIddict:DisableTS").Get<bool>())
+            {
+                options.UseAspNetCore()
+                .DisableTransportSecurityRequirement()
+                .EnableTokenEndpointPassthrough();
+            }
         });
 
 builder.Services.AddHostedService<TestData>();
@@ -95,6 +106,7 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
+// Production Configuration
 if (app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
@@ -107,8 +119,6 @@ app.UseRouting();
 app.UseAuthorization();
 
 app.UseAuthentication();
-
-
 
 //app.MapRazorPages();
 //app.MapDefaultControllerRoute();
