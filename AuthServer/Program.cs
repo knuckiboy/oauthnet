@@ -1,7 +1,15 @@
 using AuthServer;
+using AuthServer.Data;
+using AuthServer.Entities;
+using AuthServer.Handlers;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 using Serilog;
+using static OpenIddict.Server.AspNetCore.OpenIddictServerAspNetCoreHandlers;
+using static OpenIddict.Server.OpenIddictServerEvents;
+using static OpenIddict.Server.OpenIddictServerHandlers.Protection;
 
 var builder = WebApplication.CreateBuilder(args);
 // Configuration Setup
@@ -15,21 +23,28 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         {
             options.LoginPath = "/account/login";
         });
-builder.Services.AddDbContext<DbContext>(options =>
+//builder.Services.AddDbContext<DbContext>(options =>
+//{
+//    // Configure the context to use an in-memory store.
+//    options.UseInMemoryDatabase(nameof(DbContext));
+//    // Register the entity sets needed by OpenIddict.
+//    options.UseOpenIddict();
+//});
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
 {
-    // Configure the context to use an in-memory store.
-    options.UseInMemoryDatabase(nameof(DbContext));
+    if (configuration.GetValue<bool>("UseInMemoryDatabase"))
+    {
+        // Configure the context to use an in-memory store.
+        options.UseInMemoryDatabase(nameof(DbContext));
+    }
+    else
+    {
+        // Configure the Entity Framework Core to use Microsoft SQL Server.
+        options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
+    }
     // Register the entity sets needed by OpenIddict.
-    options.UseOpenIddict();
+    options.UseOpenIddict<CustomApplication, CustomAuthorization, CustomScope, CustomToken, Guid>();
 });
-/*builder.Services.AddDbContext<ApplicationDbContext>(options =>
-{
-    // Configure the Entity Framework Core to use Microsoft SQL Server.
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"));
-
-    // Register the entity sets needed by OpenIddict.
-    options.UseOpenIddict();
-});*/
 
 //Logging Configuration
 var logger = new LoggerConfiguration()
@@ -46,7 +61,9 @@ builder.Services.AddOpenIddict()
         {
             // Configure OpenIddict to use the EF Core stores/models.
             options.UseEntityFrameworkCore()
-                .UseDbContext<DbContext>();
+                .UseDbContext<ApplicationDbContext>()
+                .ReplaceDefaultEntities<CustomApplication, CustomAuthorization, CustomScope, CustomToken, Guid>();
+
         })
 
         //Use ApplicationDbContext
@@ -73,7 +90,7 @@ builder.Services.AddOpenIddict()
                 .AddEphemeralSigningKey();
 
             // Register scopes (permissions)
-            options.RegisterScopes("api");
+            options.RegisterScopes("api", "openid");
 
             // Register the ASP.NET Core host and configure the ASP.NET Core-specific options.
             options
@@ -84,6 +101,18 @@ builder.Services.AddOpenIddict()
                 .AddEphemeralEncryptionKey()
                 .AddEphemeralSigningKey()
                 .DisableAccessTokenEncryption();
+            // custom handlers
+            options.RemoveEventHandler(CreateTokenEntry.Descriptor);
+            options.RemoveEventHandler(ProcessJsonResponse<ApplyTokenResponseContext>.Descriptor);
+
+            options.AddEventHandler(TestTokenHandler.GenTokenDescriptor);
+            options.AddEventHandler(TestTokenHandler.ProcessAuthDescriptor);
+            options.AddEventHandler(TestTokenHandler.ProcessTokenDescriptor);
+            options.AddEventHandler(CustomResponseHandler.CustomResponseDescriptor);
+            options.Configure(x =>
+            {
+                x.JsonWebTokenHandler = new CustomJsonWebTokenHandler();
+            });
 
             // Production Configuration
             if (configuration.GetSection("OpenIddict:DisableTS").Get<bool>())
@@ -93,6 +122,8 @@ builder.Services.AddOpenIddict()
                 .EnableTokenEndpointPassthrough();
             }
         });
+
+
 
 builder.Services.AddHostedService<TestData>();
 
@@ -133,3 +164,21 @@ app.UseEndpoints(endpoints =>
     pattern: "{controller=Home}/{action=Index}/{id?}");*/
 
 app.Run();
+
+class CustomJsonWebTokenHandler : JsonWebTokenHandler
+{
+    public override JsonWebToken ReadJsonWebToken(string token)
+    {
+        return base.ReadJsonWebToken(token);
+    }
+
+    public override Task<TokenValidationResult> ValidateTokenAsync(string token, TokenValidationParameters validationParameters)
+    {
+        return base.ValidateTokenAsync(token, validationParameters);
+    }
+
+    public override TokenValidationResult ValidateToken(string token, TokenValidationParameters validationParameters)
+    {
+        return base.ValidateToken(token, validationParameters);
+    }
+}

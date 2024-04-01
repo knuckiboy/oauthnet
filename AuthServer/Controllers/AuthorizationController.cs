@@ -11,10 +11,18 @@ namespace AuthServer.Controllers
     public class AuthorizationController : Controller
     {
         private readonly ILogger _logger;
+        private readonly IOpenIddictApplicationManager _applicationManager;
+        private readonly IOpenIddictAuthorizationManager _authorizationManager;
+        private readonly IOpenIddictScopeManager _scopeManager;
+        private readonly IOpenIddictTokenManager _tokenManager;
 
-        public AuthorizationController(ILogger<AuthorizationController> logger)
+        public AuthorizationController(ILogger<AuthorizationController> logger, IOpenIddictApplicationManager applicationManager, IOpenIddictAuthorizationManager authorizationManager, IOpenIddictScopeManager scopeManager, IOpenIddictTokenManager tokenManager)
         {
             _logger = logger;
+            _applicationManager = applicationManager;
+            _authorizationManager = authorizationManager;
+            _scopeManager = scopeManager;
+            _tokenManager = tokenManager;
         }
 
         [HttpPost("~/connect/token")]
@@ -22,7 +30,7 @@ namespace AuthServer.Controllers
         {
             try
             {
-
+                _logger.LogInformation("Bobby");
                 var request = HttpContext.GetOpenIddictServerRequest() ??
                               throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
@@ -55,7 +63,6 @@ namespace AuthServer.Controllers
                 {
                     throw new InvalidOperationException("The specified grant type is not supported.");
                 }
-
                 return SignIn(claimsPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
 
             }
@@ -98,18 +105,27 @@ namespace AuthServer.Controllers
     {
         // 'subject' claim which is required
         new Claim(OpenIddictConstants.Claims.Subject, result.Principal.Identity.Name),
-        new Claim("some claim", "some value").SetDestinations(OpenIddictConstants.Destinations.AccessToken)
+        new Claim("some claim", "some value").SetDestinations(OpenIddictConstants.Destinations.AccessToken),
+        new Claim("CustomMessage", "text").SetDestinations(OpenIddictConstants.Destinations.AccessToken)
     };
 
                 var claimsIdentity = new ClaimsIdentity(claims, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
-
                 var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
+                var properties = new AuthenticationProperties();
+                properties.SetParameter("Test", "TesValue");
+
 
                 // Set requested scopes (this is not done automatically)
                 claimsPrincipal.SetScopes(request.GetScopes());
 
+                var ticket = new AuthenticationTicket(
+                claimsPrincipal,
+               properties,
+                OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+
                 // Signing in with the OpenIddict authentiction scheme trigger OpenIddict to issue a code (which can be exchanged for an access token)
-                return SignIn(claimsPrincipal, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+                var signInResult = SignIn(ticket.Principal, ticket.Properties, ticket.AuthenticationScheme);
+                return signInResult;
             }
             catch (Exception ex)
             {

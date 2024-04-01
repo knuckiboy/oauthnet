@@ -2,7 +2,7 @@
 # This .gitignore file was automatically created by Microsoft(R) Visual Studio.
 ################################################################################
 
-/.vs
+/AuthServer/.vs
 /AuthServer/.vs/AuthServer
 /AuthServer/bin/Debug/net6.0
 /AuthServer/bin/Release/net6.0
