@@ -4,24 +4,18 @@ using AuthServer.Entities;
 using AuthServer.Handlers;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.JsonWebTokens;
-using Microsoft.IdentityModel.Tokens;
 using Serilog;
-using static OpenIddict.Server.AspNetCore.OpenIddictServerAspNetCoreHandlers;
-using static OpenIddict.Server.OpenIddictServerEvents;
-using static OpenIddict.Server.OpenIddictServerHandlers.Protection;
 
 var builder = WebApplication.CreateBuilder(args);
 // Configuration Setup
 var configuration = builder.Configuration;
-
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
         .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
         {
-            options.LoginPath = "/account/login";
+            options.LoginPath = "/account/login"; 
         });
 //builder.Services.AddDbContext<DbContext>(options =>
 //{
@@ -66,14 +60,17 @@ builder.Services.AddOpenIddict()
 
         })
 
-        //Use ApplicationDbContext
-        /*.AddCore(options =>
+        .AddValidation(options =>
         {
-            // Configure OpenIddict to use the EF Core stores/models.
-            options.UseEntityFrameworkCore()
-                .UseDbContext<ApplicationDbContext>();
-        })*/
-        // Register the OpenIddict server components.
+
+            options.UseLocalServer();
+            // Register the ASP.NET Core host.
+            options.UseAspNetCore();
+
+            options.AddEventHandler(TestTokenValidationHandler.ValidateTokenDescriptor);
+        })
+
+        //Use ApplicationDbContext
         .AddServer(options =>
         {
             options
@@ -82,7 +79,8 @@ builder.Services.AddOpenIddict()
 
             options
             .SetAuthorizationEndpointUris(configuration.GetSection("OpenIddict:AuthorizationEndpointUrls").Get<string[]>())
-                .SetTokenEndpointUris(configuration.GetSection("OpenIddict:TokenEndpointUrls").Get<string[]>());
+                .SetTokenEndpointUris(configuration.GetSection("OpenIddict:TokenEndpointUrls").Get<string[]>())
+                 .SetUserinfoEndpointUris(configuration.GetSection("OpenIddict:UserInfoEndpointUrls").Get<string[]>());
 
             // Encryption and signing of tokens
             options
@@ -96,23 +94,14 @@ builder.Services.AddOpenIddict()
             options
                 .UseAspNetCore()
                 .EnableTokenEndpointPassthrough()
+                .EnableUserinfoEndpointPassthrough()
             .EnableAuthorizationEndpointPassthrough();
             options
                 .AddEphemeralEncryptionKey()
                 .AddEphemeralSigningKey()
                 .DisableAccessTokenEncryption();
             // custom handlers
-            options.RemoveEventHandler(CreateTokenEntry.Descriptor);
-            options.RemoveEventHandler(ProcessJsonResponse<ApplyTokenResponseContext>.Descriptor);
-
-            options.AddEventHandler(TestTokenHandler.GenTokenDescriptor);
-            options.AddEventHandler(TestTokenHandler.ProcessAuthDescriptor);
-            options.AddEventHandler(TestTokenHandler.ProcessTokenDescriptor);
-            options.AddEventHandler(CustomResponseHandler.CustomResponseDescriptor);
-            options.Configure(x =>
-            {
-                x.JsonWebTokenHandler = new CustomJsonWebTokenHandler();
-            });
+            options.AddEventHandler(TestTokenHandler.ProcessGenTokenDescriptor);
 
             // Production Configuration
             if (configuration.GetSection("OpenIddict:DisableTS").Get<bool>())
@@ -140,6 +129,7 @@ if (!app.Environment.IsDevelopment())
 // Production Configuration
 if (app.Environment.IsDevelopment())
 {
+    app.UseDeveloperExceptionPage();
     app.UseHttpsRedirection();
 }
 
@@ -147,9 +137,9 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseAuthentication();
 
 //app.MapRazorPages();
 //app.MapDefaultControllerRoute();
@@ -164,21 +154,3 @@ app.UseEndpoints(endpoints =>
     pattern: "{controller=Home}/{action=Index}/{id?}");*/
 
 app.Run();
-
-class CustomJsonWebTokenHandler : JsonWebTokenHandler
-{
-    public override JsonWebToken ReadJsonWebToken(string token)
-    {
-        return base.ReadJsonWebToken(token);
-    }
-
-    public override Task<TokenValidationResult> ValidateTokenAsync(string token, TokenValidationParameters validationParameters)
-    {
-        return base.ValidateTokenAsync(token, validationParameters);
-    }
-
-    public override TokenValidationResult ValidateToken(string token, TokenValidationParameters validationParameters)
-    {
-        return base.ValidateToken(token, validationParameters);
-    }
-}

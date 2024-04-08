@@ -2,17 +2,19 @@
 using OpenIddict.Abstractions;
 using OpenIddict.Core;
 using OpenIddict.Server;
+using System.Diagnostics;
+using System.Security.Claims;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Server.OpenIddictServerEvents;
 using static OpenIddict.Server.OpenIddictServerHandlerFilters;
+using static OpenIddict.Server.OpenIddictServerHandlers;
 using static OpenIddict.Server.OpenIddictServerHandlers.Protection;
 
 namespace AuthServer.Handlers
 {
     public static class TestTokenHandler
     {
-        public static OpenIddictServerHandlerDescriptor ProcessTokenDescriptor { get; } = OpenIddictServerHandlerDescriptor.CreateBuilder<HandleTokenRequestContext>().SetType(OpenIddictServerHandlerType.BuiltIn).UseScopedHandler<ProcessToken>().Build();
-        public static OpenIddictServerHandlerDescriptor ProcessAuthDescriptor { get; } = OpenIddictServerHandlerDescriptor.CreateBuilder<ProcessAuthenticationContext>().UseScopedHandler<ProcessAuth>().SetType(OpenIddictServerHandlerType.BuiltIn).Build();
+        public static OpenIddictServerHandlerDescriptor ProcessGenTokenDescriptor { get; } = OpenIddictServerHandlerDescriptor.CreateBuilder<ProcessSignInContext>().UseScopedHandler<CustomGenerateAuthToken>().SetOrder(AttachSignInParameters.Descriptor.Order + 1_000).SetType(OpenIddictServerHandlerType.Custom).Build();
 
         public static OpenIddictServerHandlerDescriptor GenTokenDescriptor { get; }
               = OpenIddictServerHandlerDescriptor.CreateBuilder<GenerateTokenContext>()
@@ -24,27 +26,7 @@ namespace AuthServer.Handlers
                   .SetType(OpenIddictServerHandlerType.Custom)
                   .Build();
 
-        public class ProcessToken : IOpenIddictServerHandler<HandleTokenRequestContext>
-        {
-            public ValueTask HandleAsync(HandleTokenRequestContext context)
-            {
-                var principal = context.Principal;
-                var transaction = context.Transaction;
-                return default;
-            }
-        }
-
-
-        public class ProcessAuth : IOpenIddictServerHandler<ProcessAuthenticationContext>
-        {
-
-            public ValueTask HandleAsync(ProcessAuthenticationContext context)
-            {
-                context.Logger.LogInformation(context.ToString());
-                return default;
-            }
-        }
-
+        #region Custom Fields in CustomToken
         public class CustomCreateTokenEntry : IOpenIddictServerHandler<GenerateTokenContext>
         {
 
@@ -117,6 +99,103 @@ namespace AuthServer.Handlers
                 }
 
             }
+        }
+        #endregion
+        #region Generate Custom Token and Store Access,Id token in Token table
+        public class CustomGenerateAuthToken : IOpenIddictServerHandler<ProcessSignInContext>
+        {
+            private readonly IOpenIddictTokenManager _openIddictTokenManager;
+
+            public CustomGenerateAuthToken(IOpenIddictTokenManager openIddictTokenManager)
+            {
+                _openIddictTokenManager = openIddictTokenManager;
+            }
+
+            public async ValueTask HandleAsync(ProcessSignInContext context)
+            {
+                string accessTokenId = string.Empty;
+                if (context == null)
+                {
+                    throw new ArgumentNullException("No context");
+                }
+                if (context.IsRejected || context.IsRequestHandled || context.IsRequestSkipped)
+                {
+                    throw new InvalidOperationException("Proccess not covered");
+                }
+
+                if (context.IncludeAccessToken)
+                {
+                    Debug.Assert(context.AccessTokenPrincipal is { Identity: ClaimsIdentity }, "no Identity claims");
+
+                    // Extract identifier and store the token there
+                    var identifier = context.AccessTokenPrincipal.GetTokenId();
+                    accessTokenId = identifier;
+                    if (string.IsNullOrEmpty(identifier))
+                    {
+                        throw new InvalidOperationException("Identifier not found");
+                    }
+                    var token = await _openIddictTokenManager.FindByIdAsync(identifier, context.CancellationToken);
+                    if (token is CustomToken customToken)
+                    {
+                        customToken.Token = context.AccessToken;
+                        await _openIddictTokenManager.UpdateAsync(customToken, context.CancellationToken);
+                    }
+                }
+                if (context.IncludeIdentityToken)
+                {
+                    Debug.Assert(context.IdentityTokenPrincipal is { Identity: ClaimsIdentity }, "no Identity claims");
+
+                    // Extract identifier and store the token there
+                    var identifier = context.IdentityTokenPrincipal.GetTokenId();
+                    if (string.IsNullOrEmpty(identifier))
+                    {
+                        throw new InvalidOperationException("Identifier not found");
+                    }
+                    var token = await _openIddictTokenManager.FindByIdAsync(identifier, context.CancellationToken);
+                    if (token is CustomToken customToken)
+                    {
+                        customToken.Token = context.IdentityToken;
+                        await _openIddictTokenManager.UpdateAsync(customToken, context.CancellationToken);
+                    }
+                }
+                //Todo: split to multiple event handlers and chain
+                if (context.IncludeAccessToken || context.IncludeIdentityToken)
+                {
+                    var customTokenResponse = new CustomOpenIddictResponse(context.Transaction.Response, accessTokenId!);
+                    customTokenResponse.AccessToken = accessTokenId;
+                    customTokenResponse.IdToken = null;
+                    // Todo: generate your custom token
+                    context.Transaction.Response = customTokenResponse;
+                }
+
+                context.Logger.LogTrace(nameof(CustomGenerateAuthToken));
+            }
+        }
+        #endregion
+        public class CustomOpenIddictResponse : OpenIddictResponse
+        {
+            public string CustomToken
+            {
+                get { return (string)GetParameter("custom_token"); }
+                set { SetParameter("custom_token", value); }
+            }
+
+            public CustomOpenIddictResponse(OpenIddictResponse response, string customToken)
+            {
+                AccessToken = response.AccessToken;
+                IdToken = response.IdToken;
+                ExpiresIn = response.ExpiresIn;
+                TokenType = response.TokenType;
+                RefreshToken = response.RefreshToken;
+                Iss = response.Iss;
+                DeviceCode = response.DeviceCode;
+                State = response.State;
+                UserCode = response.UserCode;
+                VerificationUriComplete = response.VerificationUriComplete;
+                ErrorUri = response.ErrorUri;
+                CustomToken = customToken;
+            }
+
         }
     }
 }

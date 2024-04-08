@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore;
 using Microsoft.Extensions.Options;
-using OpenIddict.Abstractions;
 using OpenIddict.Server;
 using OpenIddict.Server.AspNetCore;
 using System.Diagnostics;
@@ -41,8 +40,8 @@ namespace AuthServer.Handlers
 
                 var contextResponse = context.Transaction.Response;
 
-                // mock response 
-                var customResponse = new CustomOpenIddictResponse(contextResponse, "customToken");
+                //// mock response 
+                //var customResponse = new CustomOpenIddictResponse(contextResponse, "customToken");
 
                 // This handler only applies to ASP.NET Core requests. If the HTTP context cannot be resolved,
                 // this may indicate that the request was incorrectly processed by another server stack.
@@ -58,7 +57,7 @@ namespace AuthServer.Handlers
                     Indented = !_options.CurrentValue.SuppressJsonResponseIndentation
                 });
 
-                customResponse.WriteTo(writer);
+                context.Transaction.Response.WriteTo(writer);
                 writer.Flush();
 
                 response.ContentLength = stream.Length;
@@ -70,28 +69,5 @@ namespace AuthServer.Handlers
                 context.HandleRequest();
             }
         }
-    }
-
-    public class CustomOpenIddictResponse : OpenIddictResponse
-    {
-        public string CustomToken { get { return (string)GetParameter("custom_token"); }
-            set { SetParameter("custom_token", value); } }
-
-        public CustomOpenIddictResponse(OpenIddictResponse response, string customToken)
-        {
-            AccessToken = response.AccessToken;
-            IdToken = response.IdToken;
-            ExpiresIn = response.ExpiresIn;
-            TokenType = response.TokenType;
-            RefreshToken = response.RefreshToken;
-            Iss = response.Iss;
-            DeviceCode = response.DeviceCode;
-            State = response.State;
-            UserCode = response.UserCode;
-            VerificationUriComplete = response.VerificationUriComplete;
-            ErrorUri = response.ErrorUri;
-            CustomToken = customToken;
-        }
-       
     }
 }

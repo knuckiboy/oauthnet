@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
@@ -11,18 +12,10 @@ namespace AuthServer.Controllers
     public class AuthorizationController : Controller
     {
         private readonly ILogger _logger;
-        private readonly IOpenIddictApplicationManager _applicationManager;
-        private readonly IOpenIddictAuthorizationManager _authorizationManager;
-        private readonly IOpenIddictScopeManager _scopeManager;
-        private readonly IOpenIddictTokenManager _tokenManager;
 
-        public AuthorizationController(ILogger<AuthorizationController> logger, IOpenIddictApplicationManager applicationManager, IOpenIddictAuthorizationManager authorizationManager, IOpenIddictScopeManager scopeManager, IOpenIddictTokenManager tokenManager)
+        public AuthorizationController(ILogger<AuthorizationController> logger)
         {
-            _logger = logger;
-            _applicationManager = applicationManager;
-            _authorizationManager = authorizationManager;
-            _scopeManager = scopeManager;
-            _tokenManager = tokenManager;
+            _logger = logger;;
         }
 
         [HttpPost("~/connect/token")]
@@ -106,7 +99,7 @@ namespace AuthServer.Controllers
         // 'subject' claim which is required
         new Claim(OpenIddictConstants.Claims.Subject, result.Principal.Identity.Name),
         new Claim("some claim", "some value").SetDestinations(OpenIddictConstants.Destinations.AccessToken),
-        new Claim("CustomMessage", "text").SetDestinations(OpenIddictConstants.Destinations.AccessToken)
+        new Claim("CustomMessage", "text").SetDestinations(OpenIddictConstants.Destinations.IdentityToken)
     };
 
                 var claimsIdentity = new ClaimsIdentity(claims, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -133,6 +126,22 @@ namespace AuthServer.Controllers
                 throw;
             }
 
+        }
+
+
+
+        [Authorize(AuthenticationSchemes = OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)]
+        [HttpGet("~/connect/userinfo")]
+        public async Task<IActionResult> Userinfo()
+        {
+            var claimsPrincipal = (await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal;
+
+            return Ok(new
+            {
+                Name = claimsPrincipal.GetClaim(OpenIddictConstants.Claims.Subject),
+                Occupation = "Developer",
+                Age = 43
+            });
         }
     }
 }
