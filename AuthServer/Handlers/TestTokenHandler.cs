@@ -1,9 +1,13 @@
 ﻿using AuthServer.Entities;
+using Microsoft.Extensions.Configuration;
+using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
 using OpenIddict.Core;
 using OpenIddict.Server;
 using System.Diagnostics;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Server.OpenIddictServerEvents;
 using static OpenIddict.Server.OpenIddictServerHandlerFilters;
@@ -105,10 +109,12 @@ namespace AuthServer.Handlers
         public class CustomGenerateAuthToken : IOpenIddictServerHandler<ProcessSignInContext>
         {
             private readonly IOpenIddictTokenManager _openIddictTokenManager;
+            private readonly IConfiguration _configuration;
 
-            public CustomGenerateAuthToken(IOpenIddictTokenManager openIddictTokenManager)
+            public CustomGenerateAuthToken(IOpenIddictTokenManager openIddictTokenManager, IConfiguration configuration)
             {
                 _openIddictTokenManager = openIddictTokenManager;
+                _configuration = configuration;
             }
 
             public async ValueTask HandleAsync(ProcessSignInContext context)
@@ -161,11 +167,29 @@ namespace AuthServer.Handlers
                 //Todo: split to multiple event handlers and chain
                 if (context.IncludeAccessToken || context.IncludeIdentityToken)
                 {
-                    var customTokenResponse = new CustomOpenIddictResponse(context.Transaction.Response, accessTokenId!);
-                    customTokenResponse.AccessToken = accessTokenId;
-                    customTokenResponse.IdToken = null;
-                    // Todo: generate your custom token
-                    context.Transaction.Response = customTokenResponse;
+                    try
+                    {
+
+                        // Todo: generate your custom token
+
+                        var tokenHandler = new JwtSecurityTokenHandler();
+                        var tokenSecret = _configuration.GetSection("TokenConfig:Secret").Get<string>();
+                        var key = Encoding.UTF8.GetBytes(tokenSecret);
+                        var tokenDescriptor = new SecurityTokenDescriptor
+                        {
+                            Subject = new ClaimsIdentity(new[] { new Claim("id", accessTokenId) }),
+                            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
+                        };
+                        var token = tokenHandler.CreateToken(tokenDescriptor);
+                        var tokenStr = tokenHandler.WriteToken(token);
+
+                        context.Transaction.Response.AccessToken = tokenStr;
+                        context.Transaction.Response.IdToken = null;
+                    }catch (Exception ex)
+                    {
+                        context.Logger.LogError(ex.ToString());
+                        throw;
+                    }
                 }
 
                 context.Logger.LogTrace(nameof(CustomGenerateAuthToken));

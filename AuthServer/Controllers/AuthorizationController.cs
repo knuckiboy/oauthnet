@@ -15,7 +15,7 @@ namespace AuthServer.Controllers
 
         public AuthorizationController(ILogger<AuthorizationController> logger)
         {
-            _logger = logger;;
+            _logger = logger;
         }
 
         [HttpPost("~/connect/token")]
