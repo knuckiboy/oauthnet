@@ -102,6 +102,7 @@ builder.Services.AddOpenIddict()
                 .DisableAccessTokenEncryption();
             // custom handlers
             options.AddEventHandler(TestTokenHandler.ProcessGenTokenDescriptor);
+            options.AddEventHandler(TestTokenHandler.CustomTokenServerValidationDescriptor);
 
             // Production Configuration
             if (configuration.GetSection("OpenIddict:DisableTS").Get<bool>())

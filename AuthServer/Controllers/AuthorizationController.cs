@@ -23,7 +23,6 @@ namespace AuthServer.Controllers
         {
             try
             {
-                _logger.LogInformation("Bobby");
                 var request = HttpContext.GetOpenIddictServerRequest() ??
                               throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 

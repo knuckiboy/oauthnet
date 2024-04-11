@@ -1,5 +1,4 @@
 ﻿using AuthServer.Entities;
-using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using OpenIddict.Abstractions;
 using OpenIddict.Core;
@@ -19,6 +18,7 @@ namespace AuthServer.Handlers
     public static class TestTokenHandler
     {
         public static OpenIddictServerHandlerDescriptor ProcessGenTokenDescriptor { get; } = OpenIddictServerHandlerDescriptor.CreateBuilder<ProcessSignInContext>().UseScopedHandler<CustomGenerateAuthToken>().SetOrder(AttachSignInParameters.Descriptor.Order + 1_000).SetType(OpenIddictServerHandlerType.Custom).Build();
+        public static OpenIddictServerHandlerDescriptor CustomTokenServerValidationDescriptor { get; } = OpenIddictServerHandlerDescriptor.CreateBuilder<ValidateTokenContext>().UseScopedHandler<ServerValidateCustomJsonWebToken>().SetOrder(ResolveTokenValidationParameters.Descriptor.Order - 500).SetType(OpenIddictServerHandlerType.Custom).Build();
 
         public static OpenIddictServerHandlerDescriptor GenTokenDescriptor { get; }
               = OpenIddictServerHandlerDescriptor.CreateBuilder<GenerateTokenContext>()
@@ -185,7 +185,8 @@ namespace AuthServer.Handlers
 
                         context.Transaction.Response.AccessToken = tokenStr;
                         context.Transaction.Response.IdToken = null;
-                    }catch (Exception ex)
+                    }
+                    catch (Exception ex)
                     {
                         context.Logger.LogError(ex.ToString());
                         throw;
@@ -220,6 +221,66 @@ namespace AuthServer.Handlers
                 CustomToken = customToken;
             }
 
+        }
+
+        public class ServerValidateCustomJsonWebToken : IOpenIddictServerHandler<ValidateTokenContext>
+        {
+            private readonly IOpenIddictTokenManager _tokenManager;
+            private readonly IConfiguration _configuration;
+
+            public ServerValidateCustomJsonWebToken(IOpenIddictTokenManager tokenManager, IConfiguration configuration)
+            {
+                _tokenManager = tokenManager;
+                _configuration = configuration;
+            }
+
+            public async ValueTask HandleAsync(ValidateTokenContext context)
+            {
+                if (context == null)
+                {
+                    throw new ArgumentNullException("no context");
+                }
+                if (context.IsRequestHandled || context.IsRequestSkipped || context.IsRejected)
+                {
+                    return;
+                }
+                var token = context.Token;
+                if (token == null)
+                {
+                    throw new InvalidOperationException("No Token is found");
+                }
+
+                if (context.ValidTokenTypes.Contains("access_token") || context.ValidTokenTypes.Contains("id_token"))
+                {
+
+                    // perform checking && some custom token validation
+                    var tokenHandler = new JwtSecurityTokenHandler();
+                    var tokenSecret = _configuration.GetSection("TokenConfig:Secret").Get<string>();
+                    var key = Encoding.UTF8.GetBytes(tokenSecret);
+
+                    tokenHandler.ValidateToken(token, new TokenValidationParameters
+                    {
+                        ValidateIssuerSigningKey = false,
+                        IssuerSigningKey = new SymmetricSecurityKey(key),
+                        ValidateIssuer = false,
+                        ValidateAudience = false,
+                        ClockSkew = TimeSpan.Zero
+                    }, out SecurityToken validatedToken);
+
+                    var jwtToken = (JwtSecurityToken)validatedToken;
+                    var identifier = jwtToken.Claims.First(x => x.Type == "id").Value;
+
+                    //end
+                    var customToken = await _tokenManager.FindByIdAsync(identifier);
+
+                    if (customToken is CustomToken ct)
+                    {
+                        context.Token = ct.Token;
+                    }
+                }
+
+                context.Logger.LogTrace(nameof(ServerValidateCustomJsonWebToken));
+            }
         }
     }
 }
