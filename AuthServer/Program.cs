@@ -2,6 +2,7 @@ using AuthServer;
 using AuthServer.Data;
 using AuthServer.Entities;
 using AuthServer.Handlers;
+using AuthServer.Services;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
@@ -39,6 +40,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
     // Register the entity sets needed by OpenIddict.
     options.UseOpenIddict<CustomApplication, CustomAuthorization, CustomScope, CustomToken, Guid>();
 });
+
+builder.Services.AddScoped<TestTokenService>();
 
 //Logging Configuration
 var logger = new LoggerConfiguration()

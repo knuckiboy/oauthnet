@@ -1,12 +1,10 @@
 ﻿using AuthServer.Entities;
-using Microsoft.IdentityModel.Tokens;
+using AuthServer.Services;
 using OpenIddict.Abstractions;
 using OpenIddict.Core;
 using OpenIddict.Server;
 using System.Diagnostics;
-using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
-using System.Text;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Server.OpenIddictServerEvents;
 using static OpenIddict.Server.OpenIddictServerHandlerFilters;
@@ -109,17 +107,17 @@ namespace AuthServer.Handlers
         public class CustomGenerateAuthToken : IOpenIddictServerHandler<ProcessSignInContext>
         {
             private readonly IOpenIddictTokenManager _openIddictTokenManager;
-            private readonly IConfiguration _configuration;
+            private readonly TestTokenService _testTokenService;
 
-            public CustomGenerateAuthToken(IOpenIddictTokenManager openIddictTokenManager, IConfiguration configuration)
+            public CustomGenerateAuthToken(IOpenIddictTokenManager openIddictTokenManager, TestTokenService testTokenService)
             {
                 _openIddictTokenManager = openIddictTokenManager;
-                _configuration = configuration;
+                _testTokenService = testTokenService;
             }
 
             public async ValueTask HandleAsync(ProcessSignInContext context)
             {
-                string accessTokenId = string.Empty;
+                CustomToken accessToken = null;
                 if (context == null)
                 {
                     throw new ArgumentNullException("No context");
@@ -135,7 +133,6 @@ namespace AuthServer.Handlers
 
                     // Extract identifier and store the token there
                     var identifier = context.AccessTokenPrincipal.GetTokenId();
-                    accessTokenId = identifier;
                     if (string.IsNullOrEmpty(identifier))
                     {
                         throw new InvalidOperationException("Identifier not found");
@@ -144,6 +141,7 @@ namespace AuthServer.Handlers
                     if (token is CustomToken customToken)
                     {
                         customToken.Token = context.AccessToken;
+                        accessToken = customToken;
                         await _openIddictTokenManager.UpdateAsync(customToken, context.CancellationToken);
                     }
                 }
@@ -165,25 +163,15 @@ namespace AuthServer.Handlers
                     }
                 }
                 //Todo: split to multiple event handlers and chain
-                if (context.IncludeAccessToken || context.IncludeIdentityToken)
+                if (accessToken != null && (context.IncludeAccessToken || context.IncludeIdentityToken))
                 {
                     try
                     {
 
                         // Todo: generate your custom token
+                        var tokenMap = await _testTokenService.GenerateToken(accessToken);
 
-                        var tokenHandler = new JwtSecurityTokenHandler();
-                        var tokenSecret = _configuration.GetSection("TokenConfig:Secret").Get<string>();
-                        var key = Encoding.UTF8.GetBytes(tokenSecret);
-                        var tokenDescriptor = new SecurityTokenDescriptor
-                        {
-                            Subject = new ClaimsIdentity(new[] { new Claim("id", accessTokenId) }),
-                            SigningCredentials = new SigningCredentials(new SymmetricSecurityKey(key), SecurityAlgorithms.HmacSha256Signature)
-                        };
-                        var token = tokenHandler.CreateToken(tokenDescriptor);
-                        var tokenStr = tokenHandler.WriteToken(token);
-
-                        context.Transaction.Response.AccessToken = tokenStr;
+                        context.Transaction.Response.AccessToken = tokenMap.Token;
                         context.Transaction.Response.IdToken = null;
                     }
                     catch (Exception ex)
@@ -225,13 +213,11 @@ namespace AuthServer.Handlers
 
         public class ServerValidateCustomJsonWebToken : IOpenIddictServerHandler<ValidateTokenContext>
         {
-            private readonly IOpenIddictTokenManager _tokenManager;
-            private readonly IConfiguration _configuration;
+            private readonly TestTokenService _testTokenService;
 
-            public ServerValidateCustomJsonWebToken(IOpenIddictTokenManager tokenManager, IConfiguration configuration)
+            public ServerValidateCustomJsonWebToken(TestTokenService testTokenService)
             {
-                _tokenManager = tokenManager;
-                _configuration = configuration;
+                _testTokenService = testTokenService;
             }
 
             public async ValueTask HandleAsync(ValidateTokenContext context)
@@ -253,29 +239,21 @@ namespace AuthServer.Handlers
                 if (context.ValidTokenTypes.Contains("access_token") || context.ValidTokenTypes.Contains("id_token"))
                 {
 
-                    // perform checking && some custom token validation
-                    var tokenHandler = new JwtSecurityTokenHandler();
-                    var tokenSecret = _configuration.GetSection("TokenConfig:Secret").Get<string>();
-                    var key = Encoding.UTF8.GetBytes(tokenSecret);
-
-                    tokenHandler.ValidateToken(token, new TokenValidationParameters
+                    try
                     {
-                        ValidateIssuerSigningKey = false,
-                        IssuerSigningKey = new SymmetricSecurityKey(key),
-                        ValidateIssuer = false,
-                        ValidateAudience = false,
-                        ClockSkew = TimeSpan.Zero
-                    }, out SecurityToken validatedToken);
 
-                    var jwtToken = (JwtSecurityToken)validatedToken;
-                    var identifier = jwtToken.Claims.First(x => x.Type == "id").Value;
+                        // perform checking && some custom token validation
+                        _testTokenService.ValidateToken(token, out var tokenMap);
 
-                    //end
-                    var customToken = await _tokenManager.FindByIdAsync(identifier);
-
-                    if (customToken is CustomToken ct)
+                        if (tokenMap.CustomToken is CustomToken ct)
+                        {
+                            context.Token = ct.Token;
+                        }
+                    }
+                    catch (Exception ex)
                     {
-                        context.Token = ct.Token;
+                        context.Logger.LogError(ex.ToString());
+                        throw;
                     }
                 }
 
