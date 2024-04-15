@@ -14,7 +14,7 @@ namespace AuthServer.Handlers
         public static OpenIddictValidationHandlerDescriptor ValidateIdentityModelTestDescriptor { get; } = OpenIddictValidationHandlerDescriptor.CreateBuilder<ValidateTokenContext>()
                     .UseSingletonHandler<ValidateIdentityModelToken>()
                     .SetOrder(ValidateReferenceTokenIdentifier.Descriptor.Order + 1_000)
-                    .SetType(OpenIddictValidationHandlerType.BuiltIn)
+                    .SetType(OpenIddictValidationHandlerType.Custom)
                     .Build();
 
         #region Check and validate custom token and then extract identifier and pull token from token Manager
@@ -27,7 +27,7 @@ namespace AuthServer.Handlers
                 _testTokenService = testTokenService;
             }
 
-            public async ValueTask HandleAsync(ValidateTokenContext context)
+            public ValueTask HandleAsync(ValidateTokenContext context)
             {
                 if (context == null)
                 {
@@ -35,7 +35,7 @@ namespace AuthServer.Handlers
                 }
                 if (context.IsRequestHandled || context.IsRequestSkipped || context.IsRejected)
                 {
-                    return;
+                    return ValueTask.CompletedTask;
                 }
                 var token = context.Token;
                 if (token == null)
@@ -46,9 +46,12 @@ namespace AuthServer.Handlers
                 {
 
                     // perform checking && some custom token validation
-                    _testTokenService.ValidateToken(token, out var tokenMap);
-
-                    if (tokenMap.CustomToken is CustomToken ct)
+                    var isValid = _testTokenService.ValidateToken(token, out var tokenMap);
+                    if (!isValid)
+                    {
+                        throw new InvalidOperationException("Invalid Token");
+                    }
+                    if (tokenMap.AccessToken is CustomToken ct)
                     {
                         context.Token = ct.Token;
                     }
@@ -60,6 +63,7 @@ namespace AuthServer.Handlers
                 }
 
                 context.Logger.LogTrace(nameof(ValidateCustomJsonWebToken));
+                return ValueTask.CompletedTask;
             }
         }
         #endregion

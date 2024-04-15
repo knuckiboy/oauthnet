@@ -118,6 +118,7 @@ namespace AuthServer.Handlers
             public async ValueTask HandleAsync(ProcessSignInContext context)
             {
                 CustomToken accessToken = null;
+                CustomToken idToken = null;
                 if (context == null)
                 {
                     throw new ArgumentNullException("No context");
@@ -159,17 +160,18 @@ namespace AuthServer.Handlers
                     if (token is CustomToken customToken)
                     {
                         customToken.Token = context.IdentityToken;
+                        idToken = customToken;
                         await _openIddictTokenManager.UpdateAsync(customToken, context.CancellationToken);
                     }
                 }
                 //Todo: split to multiple event handlers and chain
-                if (accessToken != null && (context.IncludeAccessToken || context.IncludeIdentityToken))
+                if (accessToken != null && idToken != null)
                 {
                     try
                     {
 
                         // Todo: generate your custom token
-                        var tokenMap = await _testTokenService.GenerateToken(accessToken);
+                        var tokenMap = await _testTokenService.GenerateToken(accessToken, idToken);
 
                         context.Transaction.Response.AccessToken = tokenMap.Token;
                         context.Transaction.Response.IdToken = null;
@@ -220,7 +222,7 @@ namespace AuthServer.Handlers
                 _testTokenService = testTokenService;
             }
 
-            public async ValueTask HandleAsync(ValidateTokenContext context)
+            public ValueTask HandleAsync(ValidateTokenContext context)
             {
                 if (context == null)
                 {
@@ -228,7 +230,7 @@ namespace AuthServer.Handlers
                 }
                 if (context.IsRequestHandled || context.IsRequestSkipped || context.IsRejected)
                 {
-                    return;
+                    return ValueTask.CompletedTask;
                 }
                 var token = context.Token;
                 if (token == null)
@@ -236,16 +238,18 @@ namespace AuthServer.Handlers
                     throw new InvalidOperationException("No Token is found");
                 }
 
-                if (context.ValidTokenTypes.Contains("access_token") || context.ValidTokenTypes.Contains("id_token"))
+                if (context.ValidTokenTypes.Contains("access_token"))
                 {
-
                     try
                     {
 
                         // perform checking && some custom token validation
-                        _testTokenService.ValidateToken(token, out var tokenMap);
-
-                        if (tokenMap.CustomToken is CustomToken ct)
+                        var isValid = _testTokenService.ValidateToken(token, out var tokenMap);
+                        if (!isValid)
+                        {
+                            throw new InvalidOperationException("Invalid Token");
+                        }
+                        if (tokenMap.AccessToken is CustomToken ct)
                         {
                             context.Token = ct.Token;
                         }
@@ -258,6 +262,7 @@ namespace AuthServer.Handlers
                 }
 
                 context.Logger.LogTrace(nameof(ServerValidateCustomJsonWebToken));
+                return ValueTask.CompletedTask;
             }
         }
     }

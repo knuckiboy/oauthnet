@@ -15,13 +15,14 @@ namespace AuthServer.Services
             _dbContext = dbContext;
         }
 
-        public async Task<TokenMap> GenerateToken(CustomToken customToken, int length = 255)
+        public async Task<TokenMap> GenerateToken(CustomToken customToken, CustomToken idToken, int length = 255)
         {
             string token = GenerateRandomToken(length);
             var tokenMap = new TokenMap
             {
                 Token = token,
-                CustomToken = customToken,
+                AccessToken = customToken,
+                IdToken = idToken,
             };
             _dbContext.TokenMaps.Add(tokenMap);
             await _dbContext.SaveChangesAsync();
@@ -50,7 +51,7 @@ namespace AuthServer.Services
         public bool ValidateToken(string token, out TokenMap tokenMap)
         {
             // TODO: login/logout date validation etc
-            tokenMap = _dbContext.TokenMaps.AsNoTracking().Include(x => x.CustomToken).FirstOrDefault(x => string.Equals(x.Token, token));
+            tokenMap = _dbContext.TokenMaps.AsNoTracking().Include(x => x.AccessToken).FirstOrDefault(x => string.Equals(x.Token, token));
             return tokenMap != null;
         }
 

@@ -111,8 +111,7 @@ builder.Services.AddOpenIddict()
             if (configuration.GetSection("OpenIddict:DisableTS").Get<bool>())
             {
                 options.UseAspNetCore()
-                .DisableTransportSecurityRequirement()
-                .EnableTokenEndpointPassthrough();
+                .DisableTransportSecurityRequirement();
             }
         });
 
