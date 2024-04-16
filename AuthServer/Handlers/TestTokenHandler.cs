@@ -179,7 +179,10 @@ namespace AuthServer.Handlers
                     catch (Exception ex)
                     {
                         context.Logger.LogError(ex.ToString());
-                        throw;
+                        context.Reject(
+                       error: Errors.InvalidRequest, ex.Message);
+
+                        return;
                     }
                 }
 
@@ -235,7 +238,10 @@ namespace AuthServer.Handlers
                 var token = context.Token;
                 if (token == null)
                 {
-                    throw new InvalidOperationException("No Token is found");
+                    context.Reject(
+                        error: Errors.MissingToken, "Missing Token");
+
+                    return ValueTask.CompletedTask;
                 }
 
                 if (context.ValidTokenTypes.Contains("access_token"))
@@ -247,7 +253,10 @@ namespace AuthServer.Handlers
                         var isValid = _testTokenService.ValidateToken(token, out var tokenMap);
                         if (!isValid)
                         {
-                            throw new InvalidOperationException("Invalid Token");
+                            context.Reject(
+                             error: Errors.InvalidToken, "Invalid Token");
+
+                            return ValueTask.CompletedTask;
                         }
                         if (tokenMap.AccessToken is CustomToken ct)
                         {
@@ -257,7 +266,10 @@ namespace AuthServer.Handlers
                     catch (Exception ex)
                     {
                         context.Logger.LogError(ex.ToString());
-                        throw;
+                        context.Reject(
+                       error: Errors.InvalidRequest, ex.Message);
+
+                        return ValueTask.CompletedTask;
                     }
                 }
 

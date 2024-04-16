@@ -1,6 +1,7 @@
 ﻿using AuthServer.Entities;
 using AuthServer.Services;
 using OpenIddict.Validation;
+using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Validation.OpenIddictValidationEvents;
 using static OpenIddict.Validation.OpenIddictValidationHandlers.Protection;
 
@@ -40,7 +41,10 @@ namespace AuthServer.Handlers
                 var token = context.Token;
                 if (token == null)
                 {
-                    throw new InvalidOperationException("No Token is found");
+                    context.Reject(
+                        error: Errors.MissingToken, "Missing Token");
+
+                    return ValueTask.CompletedTask;
                 }
                 try
                 {
@@ -49,7 +53,10 @@ namespace AuthServer.Handlers
                     var isValid = _testTokenService.ValidateToken(token, out var tokenMap);
                     if (!isValid)
                     {
-                        throw new InvalidOperationException("Invalid Token");
+                        context.Reject(
+                         error: Errors.InvalidToken, "Invalid Token");
+
+                        return ValueTask.CompletedTask;
                     }
                     if (tokenMap.AccessToken is CustomToken ct)
                     {
@@ -59,7 +66,10 @@ namespace AuthServer.Handlers
                 catch (Exception ex)
                 {
                     context.Logger.LogError(ex.ToString());
-                    throw;
+                    context.Reject(
+                        error: Errors.InvalidRequest, ex.Message);
+
+                    return ValueTask.CompletedTask;
                 }
 
                 context.Logger.LogTrace(nameof(ValidateCustomJsonWebToken));
