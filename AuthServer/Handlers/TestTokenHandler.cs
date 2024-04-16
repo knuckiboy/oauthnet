@@ -165,7 +165,7 @@ namespace AuthServer.Handlers
                     }
                 }
                 //Todo: split to multiple event handlers and chain
-                if (accessToken != null && idToken != null)
+                if (accessToken != null)
                 {
                     try
                     {
