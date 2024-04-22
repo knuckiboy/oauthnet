@@ -65,7 +65,6 @@ builder.Services.AddOpenIddict()
 
         .AddValidation(options =>
         {
-
             options.UseLocalServer();
             // Register the ASP.NET Core host.
             options.UseAspNetCore();
@@ -115,8 +114,6 @@ builder.Services.AddOpenIddict()
             }
         });
 
-
-
 builder.Services.AddHostedService<TestData>();
 
 var app = builder.Build();
@@ -140,8 +137,14 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseCors(builder => builder
+      .AllowAnyOrigin()
+      .AllowAnyHeader()
+      .AllowAnyMethod());
+
 app.UseAuthentication();
 app.UseAuthorization();
+
 
 
 //app.MapRazorPages();

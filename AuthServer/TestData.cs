@@ -57,7 +57,7 @@ namespace AuthServer
                 {
                     ClientId = "postman1",
                     DisplayName = "Postman",
-                    RedirectUris = JsonSerializer.Serialize(new HashSet<Uri> { new Uri("https://oauth.pstmn.io/v1/callback") }),
+                    RedirectUris = JsonSerializer.Serialize(new HashSet<Uri> { new Uri("https://oauth.pstmn.io/v1/callback"), new Uri("http://localhost:5173/callback") }),
                     Permissions = JsonSerializer.Serialize(new HashSet<string>
                     {
                             OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -74,9 +74,9 @@ namespace AuthServer
 
             }
 
-             
+
         }
 
-public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
