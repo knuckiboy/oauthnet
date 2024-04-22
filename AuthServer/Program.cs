@@ -16,7 +16,7 @@ builder.Services.AddControllersWithViews();
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
         .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
         {
-            options.LoginPath = "/account/login"; 
+            options.LoginPath = "/account/login";
         });
 //builder.Services.AddDbContext<DbContext>(options =>
 //{
@@ -78,6 +78,7 @@ builder.Services.AddOpenIddict()
             options
                 .AllowClientCredentialsFlow();
             options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange();
+            options.SetAccessTokenLifetime(TimeSpan.FromMinutes(configuration.GetSection("TokenExpiration").Get<int>()));
 
             options
             .SetAuthorizationEndpointUris(configuration.GetSection("OpenIddict:AuthorizationEndpointUrls").Get<string[]>())
