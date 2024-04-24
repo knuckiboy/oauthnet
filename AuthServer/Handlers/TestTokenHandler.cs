@@ -107,18 +107,21 @@ namespace AuthServer.Handlers
         public class CustomGenerateAuthToken : IOpenIddictServerHandler<ProcessSignInContext>
         {
             private readonly IOpenIddictTokenManager _openIddictTokenManager;
+            private readonly IOpenIddictAuthorizationManager _openIddictAuthorizationManager;
             private readonly TestTokenService _testTokenService;
 
-            public CustomGenerateAuthToken(IOpenIddictTokenManager openIddictTokenManager, TestTokenService testTokenService)
+            public CustomGenerateAuthToken(IOpenIddictTokenManager openIddictTokenManager, TestTokenService testTokenService, IOpenIddictAuthorizationManager openIddictAuthorizationManager)
             {
                 _openIddictTokenManager = openIddictTokenManager;
                 _testTokenService = testTokenService;
+                _openIddictAuthorizationManager = openIddictAuthorizationManager;
             }
 
             public async ValueTask HandleAsync(ProcessSignInContext context)
             {
                 CustomToken accessToken = null;
                 CustomToken idToken = null;
+                CustomAuthorization customAuthorization = null;
                 if (context == null)
                 {
                     throw new ArgumentNullException("No context");
@@ -164,14 +167,27 @@ namespace AuthServer.Handlers
                         await _openIddictTokenManager.UpdateAsync(customToken, context.CancellationToken);
                     }
                 }
+
+                var identity = (ClaimsIdentity)context.Principal.Identity;
+                var authId = identity?.GetAuthorizationId();
+                if (identity != null && authId != null)
+                {
+
+                    var authorization = await _openIddictAuthorizationManager.FindByIdAsync(authId, context.CancellationToken);
+                    if (authorization is CustomAuthorization cA)
+                    {
+                        customAuthorization = cA;
+                    }
+                }
+
                 //Todo: split to multiple event handlers and chain
                 if (accessToken != null)
                 {
                     try
                     {
-
+                        var identifier = identity.GetClaim(Claims.Subject);
                         // Todo: generate your custom token
-                        var tokenMap = await _testTokenService.GenerateToken(accessToken, idToken);
+                        var tokenMap = await _testTokenService.GenerateToken(identifier, accessToken, idToken, customAuthorization);
 
                         context.Transaction.Response.AccessToken = tokenMap.Token;
                         context.Transaction.Response.IdToken = null;

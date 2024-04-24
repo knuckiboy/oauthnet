@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore;
+﻿using AuthServer.Services;
+using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
@@ -12,10 +13,12 @@ namespace AuthServer.Controllers
     public class AuthorizationController : Controller
     {
         private readonly ILogger _logger;
+        private readonly TestTokenService _tokenService;
 
-        public AuthorizationController(ILogger<AuthorizationController> logger)
+        public AuthorizationController(ILogger<AuthorizationController> logger, TestTokenService tokenService)
         {
             _logger = logger;
+            _tokenService = tokenService;
         }
 
         [HttpPost("~/connect/token")]
@@ -97,8 +100,6 @@ namespace AuthServer.Controllers
     {
         // 'subject' claim which is required
         new Claim(OpenIddictConstants.Claims.Subject, result.Principal.Identity.Name),
-        new Claim("some claim", "some value").SetDestinations(OpenIddictConstants.Destinations.AccessToken),
-        new Claim("CustomMessage", "text").SetDestinations(OpenIddictConstants.Destinations.IdentityToken)
     };
 
                 var claimsIdentity = new ClaimsIdentity(claims, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
@@ -141,6 +142,32 @@ namespace AuthServer.Controllers
                 Occupation = "Developer",
                 Age = 43
             });
+        }
+
+        [HttpGet("~/connect/logout")]
+        public async Task<IActionResult> LogoutAsync()
+        {
+            var bearerToken = HttpContext.Request.Headers.Authorization.ToString();
+            var identifier = HttpContext.User.Identity.Name;
+            if (!string.IsNullOrEmpty(bearerToken))
+            {
+                bearerToken = bearerToken.Replace("Bearer ", "");
+                if (!await _tokenService.RevokeToken(bearerToken))
+                {
+                    return BadRequest("Fail to revoke token");
+                }
+            }
+            else
+            {
+                await _tokenService.RevokeTokenByIdentifier(identifier);
+            }
+            await HttpContext.SignOutAsync();
+            return SignOut(
+          authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
+          properties: new AuthenticationProperties
+          {
+              RedirectUri = "/"
+          });
         }
     }
 }

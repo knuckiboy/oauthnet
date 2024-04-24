@@ -17,6 +17,8 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
         {
             options.LoginPath = "/account/login";
+            options.LogoutPath = "/account/logout";
+            options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
         });
 //builder.Services.AddDbContext<DbContext>(options =>
 //{
@@ -83,7 +85,8 @@ builder.Services.AddOpenIddict()
             options
             .SetAuthorizationEndpointUris(configuration.GetSection("OpenIddict:AuthorizationEndpointUrls").Get<string[]>())
                 .SetTokenEndpointUris(configuration.GetSection("OpenIddict:TokenEndpointUrls").Get<string[]>())
-                 .SetUserinfoEndpointUris(configuration.GetSection("OpenIddict:UserInfoEndpointUrls").Get<string[]>());
+                 .SetUserinfoEndpointUris(configuration.GetSection("OpenIddict:UserInfoEndpointUrls").Get<string[]>())
+                    .SetLogoutEndpointUris(configuration.GetSection("OpenIddict:LogoutEndpointUrls").Get<string[]>());
 
             // Encryption and signing of tokens
             options
@@ -98,6 +101,7 @@ builder.Services.AddOpenIddict()
                 .UseAspNetCore()
                 .EnableTokenEndpointPassthrough()
                 .EnableUserinfoEndpointPassthrough()
+                .EnableLogoutEndpointPassthrough()
             .EnableAuthorizationEndpointPassthrough();
             options
                 .AddEphemeralEncryptionKey()
