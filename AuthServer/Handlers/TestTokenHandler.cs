@@ -34,13 +34,11 @@ namespace AuthServer.Handlers
 
             private readonly OpenIddictApplicationManager<CustomApplication> _applicationManager;
             private readonly OpenIddictTokenManager<CustomToken> _tokenManager;
-            private readonly OpenIddictAuthorizationManager<CustomAuthorization> _authorizeManager;
 
-            public CustomCreateTokenEntry(OpenIddictApplicationManager<CustomApplication> applicationManager, OpenIddictTokenManager<CustomToken> tokenManager, OpenIddictAuthorizationManager<CustomAuthorization> authorizeManager)
+            public CustomCreateTokenEntry(OpenIddictApplicationManager<CustomApplication> applicationManager, OpenIddictTokenManager<CustomToken> tokenManager)
             {
                 _applicationManager = applicationManager ?? throw new ArgumentException(nameof(OpenIddictApplicationManager<CustomApplication>));
                 _tokenManager = tokenManager ?? throw new ArgumentException(nameof(OpenIddictTokenManager<CustomToken>));
-                _authorizeManager = authorizeManager ?? throw new ArgumentException(nameof(OpenIddictAuthorizationManager<CustomAuthorization>));
             }
 
             public async ValueTask HandleAsync(GenerateTokenContext context)
@@ -168,11 +166,10 @@ namespace AuthServer.Handlers
                     }
                 }
 
-                var identity = (ClaimsIdentity)context.Principal.Identity;
+                var identity = context.Principal.Identity as ClaimsIdentity;
                 var authId = identity?.GetAuthorizationId();
                 if (identity != null && authId != null)
                 {
-
                     var authorization = await _openIddictAuthorizationManager.FindByIdAsync(authId, context.CancellationToken);
                     if (authorization is CustomAuthorization cA)
                     {
@@ -206,32 +203,8 @@ namespace AuthServer.Handlers
             }
         }
         #endregion
-        public class CustomOpenIddictResponse : OpenIddictResponse
-        {
-            public string CustomToken
-            {
-                get { return (string)GetParameter("custom_token"); }
-                set { SetParameter("custom_token", value); }
-            }
 
-            public CustomOpenIddictResponse(OpenIddictResponse response, string customToken)
-            {
-                AccessToken = response.AccessToken;
-                IdToken = response.IdToken;
-                ExpiresIn = response.ExpiresIn;
-                TokenType = response.TokenType;
-                RefreshToken = response.RefreshToken;
-                Iss = response.Iss;
-                DeviceCode = response.DeviceCode;
-                State = response.State;
-                UserCode = response.UserCode;
-                VerificationUriComplete = response.VerificationUriComplete;
-                ErrorUri = response.ErrorUri;
-                CustomToken = customToken;
-            }
-
-        }
-
+        #region Server Validation
         public class ServerValidateCustomJsonWebToken : IOpenIddictServerHandler<ValidateTokenContext>
         {
             private readonly TestTokenService _testTokenService;
@@ -292,6 +265,33 @@ namespace AuthServer.Handlers
                 context.Logger.LogTrace(nameof(ServerValidateCustomJsonWebToken));
                 return ValueTask.CompletedTask;
             }
+        }
+        #endregion
+
+        public class CustomOpenIddictResponse : OpenIddictResponse
+        {
+            public string CustomToken
+            {
+                get { return (string)GetParameter("custom_token"); }
+                set { SetParameter("custom_token", value); }
+            }
+
+            public CustomOpenIddictResponse(OpenIddictResponse response, string customToken)
+            {
+                AccessToken = response.AccessToken;
+                IdToken = response.IdToken;
+                ExpiresIn = response.ExpiresIn;
+                TokenType = response.TokenType;
+                RefreshToken = response.RefreshToken;
+                Iss = response.Iss;
+                DeviceCode = response.DeviceCode;
+                State = response.State;
+                UserCode = response.UserCode;
+                VerificationUriComplete = response.VerificationUriComplete;
+                ErrorUri = response.ErrorUri;
+                CustomToken = customToken;
+            }
+
         }
     }
 }

@@ -14,11 +14,13 @@ namespace AuthServer.Controllers
     {
         private readonly ILogger _logger;
         private readonly TestTokenService _tokenService;
+        private readonly IConfiguration _configuration;
 
-        public AuthorizationController(ILogger<AuthorizationController> logger, TestTokenService tokenService)
+        public AuthorizationController(ILogger<AuthorizationController> logger, TestTokenService tokenService, IConfiguration configuration)
         {
             _logger = logger;
             _tokenService = tokenService;
+            _configuration = configuration;
         }
 
         [HttpPost("~/connect/token")]
@@ -52,6 +54,13 @@ namespace AuthServer.Controllers
                 {
                     // Retrieve the claims principal stored in the authorization code
                     claimsPrincipal = (await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal;
+                    string identifier = claimsPrincipal.GetClaim(OpenIddictConstants.Claims.Subject);
+
+                    var userToFailToken = _configuration.GetValue("FailTokenIdentifiers", Array.Empty<string>());
+                    if (userToFailToken.Contains(identifier))
+                    {
+                        return Unauthorized();
+                    }
                 }
 
                 else
@@ -105,8 +114,6 @@ namespace AuthServer.Controllers
                 var claimsIdentity = new ClaimsIdentity(claims, OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
                 var claimsPrincipal = new ClaimsPrincipal(claimsIdentity);
                 var properties = new AuthenticationProperties();
-                properties.SetParameter("Test", "TesValue");
-
 
                 // Set requested scopes (this is not done automatically)
                 claimsPrincipal.SetScopes(request.GetScopes());
@@ -152,22 +159,14 @@ namespace AuthServer.Controllers
             if (!string.IsNullOrEmpty(bearerToken))
             {
                 bearerToken = bearerToken.Replace("Bearer ", "");
-                if (!await _tokenService.RevokeToken(bearerToken))
-                {
-                    return BadRequest("Fail to revoke token");
-                }
+                await _tokenService.RevokeToken(bearerToken);
             }
             else
             {
                 await _tokenService.RevokeTokenByIdentifier(identifier);
             }
             await HttpContext.SignOutAsync();
-            return SignOut(
-          authenticationSchemes: OpenIddictServerAspNetCoreDefaults.AuthenticationScheme,
-          properties: new AuthenticationProperties
-          {
-              RedirectUri = "/"
-          });
+            return RedirectToAction(nameof(HomeController.Index), "Home");
         }
     }
 }

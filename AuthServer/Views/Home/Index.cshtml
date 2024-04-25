@@ -7,6 +7,8 @@
 @using Microsoft.AspNetCore.Authentication
 @using System.Globalization
 
+@model HomeViewModel
+
 <div class="text-center">
     <h1 class="display-4">Welcome Authorization Server</h1>
 
@@ -28,6 +30,26 @@
             <dd>@expires</dd>
         </dl>
         <hr />
+        @if (Model.Tokens.Count > 0)
+        {
+            <table width="100%" border="0">
+                <tr>
+                    <th>Token</th>
+                    <th>Create Date</th>
+                    <th>Expiration Date</th>
+                    <th>Type</th>
+                </tr>
+                @foreach (var token in Model.Tokens)
+                {
+                    <tr>
+                        <td>@token.Token.Substring(0,15)</td>
+                        <td>@token.CreationDate.ToLocalTime()</td>
+                        <td>@token.ExpirationDate.ToLocalTime()</td>
+                        <td>@token.Type</td>
+                    </tr>
+                }
+            </table>
+        }
         <p><a class="btn btn-dark" asp-controller="Account" asp-action="Logout">Logout</a></p>
     </div>
 }

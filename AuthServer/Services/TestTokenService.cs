@@ -1,5 +1,6 @@
 ﻿using AuthServer.Data;
 using AuthServer.Entities;
+using AuthServer.Models;
 using Microsoft.EntityFrameworkCore;
 using OpenIddict.Core;
 using System.Security.Cryptography;
@@ -90,6 +91,19 @@ namespace AuthServer.Services
             }
             var result = await _dbContext.SaveChangesAsync();
             return result >= 1;
+        }
+
+        public async Task<List<TokenInfo>> RetrieveTokensByIdentifier(string identifier)
+        {
+            var tokenMaps = _dbContext.TokenMaps.AsNoTracking().Where(x => x.Identifier == identifier && x.Status == Status.Valid);
+            var info = await tokenMaps.Select(x => new TokenInfo
+            {
+                Type = x.AccessToken.Type,
+                CreationDate = x.AccessToken.CreationDate ?? default,
+                ExpirationDate = x.AccessToken.ExpirationDate ?? default,
+                Token = x.AccessToken.Token
+            }).ToListAsync();
+            return info;
         }
 
     }

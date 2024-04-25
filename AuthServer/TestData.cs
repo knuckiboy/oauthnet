@@ -10,10 +10,12 @@ namespace AuthServer
     public class TestData : IHostedService
     {
         private readonly IServiceProvider _serviceProvider;
+        private readonly IConfiguration _configuration;
 
-        public TestData(IServiceProvider serviceProvider)
+        public TestData(IServiceProvider serviceProvider, IConfiguration configuration)
         {
             _serviceProvider = serviceProvider;
+            _configuration = configuration;
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -53,11 +55,13 @@ namespace AuthServer
                 //}
                 //}, cancellationToken);
 
+                var urls = _configuration.GetRequiredSection("OpenIddict:RedirectUris").Get<string[]>();
+
                 await manager.CreateAsync(new CustomApplication
                 {
                     ClientId = "postman1",
                     DisplayName = "Postman",
-                    RedirectUris = JsonSerializer.Serialize(new HashSet<Uri> { new Uri("https://oauth.pstmn.io/v1/callback"), new Uri("http://localhost:5173/callback") }),
+                    RedirectUris = JsonSerializer.Serialize(urls.Select(x => new Uri(x)).ToHashSet()),
                     Permissions = JsonSerializer.Serialize(new HashSet<string>
                     {
                             OpenIddictConstants.Permissions.Endpoints.Authorization,

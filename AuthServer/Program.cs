@@ -18,7 +18,7 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         {
             options.LoginPath = "/account/login";
             options.LogoutPath = "/account/logout";
-            options.ExpireTimeSpan = TimeSpan.FromMinutes(5);
+            options.ExpireTimeSpan = TimeSpan.FromMinutes(20);
         });
 //builder.Services.AddDbContext<DbContext>(options =>
 //{
@@ -86,7 +86,9 @@ builder.Services.AddOpenIddict()
             .SetAuthorizationEndpointUris(configuration.GetSection("OpenIddict:AuthorizationEndpointUrls").Get<string[]>())
                 .SetTokenEndpointUris(configuration.GetSection("OpenIddict:TokenEndpointUrls").Get<string[]>())
                  .SetUserinfoEndpointUris(configuration.GetSection("OpenIddict:UserInfoEndpointUrls").Get<string[]>())
-                    .SetLogoutEndpointUris(configuration.GetSection("OpenIddict:LogoutEndpointUrls").Get<string[]>());
+                    .SetLogoutEndpointUris(configuration.GetSection("OpenIddict:LogoutEndpointUrls").Get<string[]>())
+                    .SetIntrospectionEndpointUris(configuration.GetSection("OpenIddict:IntrospectEndpointUrls").Get<string[]>())
+                    ;
 
             // Encryption and signing of tokens
             options
@@ -149,8 +151,6 @@ app.UseCors(builder => builder
 
 app.UseAuthentication();
 app.UseAuthorization();
-
-
 
 //app.MapRazorPages();
 //app.MapDefaultControllerRoute();
