@@ -1,7 +1,12 @@
-﻿namespace AuthServer.Entities
+﻿using Microsoft.EntityFrameworkCore;
+using System.ComponentModel.DataAnnotations;
+
+namespace AuthServer.Entities
 {
+    [Index(nameof(Identifier))]
     public class TokenMap
     {
+        [Key]
         public Guid Id { get; set; }
 
         public string Identifier { get; set; }

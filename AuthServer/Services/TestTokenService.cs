@@ -67,7 +67,11 @@ namespace AuthServer.Services
 
         public async Task<bool> RevokeToken(string token)
         {
-            var tokenMaps = await _dbContext.TokenMaps.Include(x => x.AccessToken).Include(x => x.IdToken).Include(x => x.Authorization).Where(x => string.Equals(x.Token, token) && x.Status == Status.Valid).ToListAsync();
+            var tokenMaps = await _dbContext.TokenMaps.Include(x => x.AccessToken)
+                                                      .Include(x => x.IdToken)
+                                                      .Include(x => x.Authorization)
+                                                      .Where(x => string.Equals(x.Token, token) && x.Status == Status.Valid)
+                                                      .ToListAsync();
             foreach (var item in tokenMaps)
             {
                 await _tokenManager.TryRevokeAsync(item.AccessToken);
@@ -81,7 +85,11 @@ namespace AuthServer.Services
 
         public async Task<bool> RevokeTokenByIdentifier(string identifier)
         {
-            var tokenMaps = await _dbContext.TokenMaps.Include(x => x.AccessToken).Include(x => x.IdToken).Include(x => x.Authorization).Where(x => x.Identifier == identifier && x.Status == Status.Valid).ToListAsync();
+            var tokenMaps = await _dbContext.TokenMaps.Include(x => x.AccessToken)
+                                                      .Include(x => x.IdToken)
+                                                      .Include(x => x.Authorization)
+                                                      .Where(x => x.Identifier == identifier && x.Status == Status.Valid)
+                                                      .ToListAsync();
             foreach (var item in tokenMaps)
             {
                 await _tokenManager.TryRevokeAsync(item.AccessToken);

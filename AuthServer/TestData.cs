@@ -55,22 +55,26 @@ namespace AuthServer
                 //}
                 //}, cancellationToken);
 
-                var urls = _configuration.GetRequiredSection("OpenIddict:RedirectUris").Get<string[]>();
+                var redirectUrls = _configuration.GetSection("OpenIddict:RedirectUris").Get<string[]>();
+                var logoutUrls = _configuration.GetSection("OpenIddict:PostLogoutUris").Get<string[]>();
 
                 await manager.CreateAsync(new CustomApplication
                 {
                     ClientId = "postman1",
                     DisplayName = "Postman",
-                    RedirectUris = JsonSerializer.Serialize(urls.Select(x => new Uri(x)).ToHashSet()),
+                    RedirectUris = JsonSerializer.Serialize(redirectUrls.Select(x => new Uri(x)).ToHashSet()),
                     Permissions = JsonSerializer.Serialize(new HashSet<string>
                     {
                             OpenIddictConstants.Permissions.Endpoints.Authorization,
                             OpenIddictConstants.Permissions.Endpoints.Token,
                             OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
                             OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
+                            OpenIddictConstants.Permissions.Endpoints.Introspection,
+                            OpenIddictConstants.Permissions.Endpoints.Logout,
                             OpenIddictConstants.Permissions.Prefixes.Scope + "api",
                             OpenIddictConstants.Permissions.ResponseTypes.Code
                     }),
+                    PostLogoutRedirectUris = JsonSerializer.Serialize(logoutUrls.Select(x => new Uri(x)).ToHashSet()),
                     CustomApp = "Custom Text",
                     Requirements = JsonSerializer.Serialize(new HashSet<string> { Requirements.Features.ProofKeyForCodeExchange })
                 }, "postman1-secret", cancellationToken);

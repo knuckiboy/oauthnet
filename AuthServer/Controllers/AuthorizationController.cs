@@ -166,7 +166,7 @@ namespace AuthServer.Controllers
                 await _tokenService.RevokeTokenByIdentifier(identifier);
             }
             await HttpContext.SignOutAsync();
-            return RedirectToAction(nameof(HomeController.Index), "Home");
+            return SignOut(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
     }
 }
