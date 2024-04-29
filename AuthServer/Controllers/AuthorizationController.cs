@@ -56,11 +56,17 @@ namespace AuthServer.Controllers
                     claimsPrincipal = (await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal;
                     string identifier = claimsPrincipal.GetClaim(OpenIddictConstants.Claims.Subject);
 
-                    var userToFailToken = _configuration.GetValue("FailTokenIdentifiers", Array.Empty<string>());
+                    var userToFailToken = _configuration.GetSection("FailTokenIdentifiers").Get<string[]>() ?? Array.Empty<string>();
                     if (userToFailToken.Contains(identifier))
                     {
+                        await HttpContext.SignOutAsync();
                         return Unauthorized();
                     }
+                }
+                else if (request.IsRefreshTokenGrantType())
+                {
+                    // Retrieve the claims principal stored in the authorization code
+                    claimsPrincipal = (await HttpContext.AuthenticateAsync(OpenIddictServerAspNetCoreDefaults.AuthenticationScheme)).Principal;
                 }
 
                 else
@@ -89,9 +95,16 @@ namespace AuthServer.Controllers
                 var request = HttpContext.GetOpenIddictServerRequest() ??
                     throw new InvalidOperationException("The OpenID Connect request cannot be retrieved.");
 
+
                 // Retrieve the user principal stored in the authentication cookie.
                 var result = await HttpContext.AuthenticateAsync(CookieAuthenticationDefaults.AuthenticationScheme);
 
+                var userToFailToken = _configuration.GetSection("FailAuthorizeIdentifiers").Get<string[]>() ?? Array.Empty<string>();
+                if (result.Principal != null && userToFailToken.Contains(result.Principal.Identity.Name))
+                {
+                    await HttpContext.SignOutAsync();
+                    return Unauthorized();
+                }
                 // If the user principal can't be extracted, redirect the user to the login page.
                 if (!result.Succeeded)
                 {

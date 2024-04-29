@@ -1,5 +1,6 @@
 ﻿using AuthServer.Entities;
 using AuthServer.Services;
+using OpenIddict.Abstractions;
 using OpenIddict.Validation;
 using static OpenIddict.Abstractions.OpenIddictConstants;
 using static OpenIddict.Validation.OpenIddictValidationEvents;
@@ -62,6 +63,12 @@ namespace AuthServer.Handlers
                     {
                         context.Token = ct.Token;
                     }
+
+                    if (context.Request?.IsRefreshTokenGrantType() ?? false)
+                    {
+                        context.Request.RefreshToken = tokenMap.RefreshToken.Token;
+                    }
+
                 }
                 catch (Exception ex)
                 {

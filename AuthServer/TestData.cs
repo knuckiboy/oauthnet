@@ -69,6 +69,7 @@ namespace AuthServer
                             OpenIddictConstants.Permissions.Endpoints.Token,
                             OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
                             OpenIddictConstants.Permissions.GrantTypes.ClientCredentials,
+                            OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
                             OpenIddictConstants.Permissions.Endpoints.Introspection,
                             OpenIddictConstants.Permissions.Endpoints.Logout,
                             OpenIddictConstants.Permissions.Prefixes.Scope + "api",

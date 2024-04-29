@@ -13,6 +13,7 @@ namespace AuthServer.Entities
         public string Token { get; set; }
         public CustomToken AccessToken { get; set; }
         public CustomToken? IdToken { get; set; }
+        public CustomToken? RefreshToken { get; set; }
         public CustomAuthorization Authorization { get; set; }
         public DateTime? CreatedAt { get; set; }
         public Status Status { get; set; }

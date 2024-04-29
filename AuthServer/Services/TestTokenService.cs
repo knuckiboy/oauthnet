@@ -21,7 +21,7 @@ namespace AuthServer.Services
             _tokenManager = tokenManager;
         }
 
-        public async Task<TokenMap> GenerateToken(string subject, CustomToken customToken, CustomToken idToken, CustomAuthorization customAuthorization, int length = 255)
+        public async Task<TokenMap> GenerateToken(string subject, CustomToken customToken, CustomToken idToken, CustomToken refreshToken, CustomAuthorization customAuthorization, int length = 255)
         {
             string token = GenerateRandomToken(length);
             var tokenMap = new TokenMap
@@ -29,6 +29,7 @@ namespace AuthServer.Services
                 Token = token,
                 AccessToken = customToken,
                 IdToken = idToken,
+                RefreshToken = refreshToken,
                 CreatedAt = DateTime.UtcNow,
                 Authorization = customAuthorization,
                 Identifier = subject,
@@ -61,7 +62,7 @@ namespace AuthServer.Services
         public bool ValidateToken(string token, out TokenMap tokenMap)
         {
             // TODO: login/logout date validation etc
-            tokenMap = _dbContext.TokenMaps.AsNoTracking().Include(x => x.AccessToken).FirstOrDefault(x => string.Equals(x.Token, token));
+            tokenMap = _dbContext.TokenMaps.AsNoTracking().Include(x => x.AccessToken).Include(x => x.RefreshToken).FirstOrDefault(x => string.Equals(x.Token, token));
             return tokenMap != null && tokenMap.Status == Status.Valid;
         }
 
@@ -69,6 +70,7 @@ namespace AuthServer.Services
         {
             var tokenMaps = await _dbContext.TokenMaps.Include(x => x.AccessToken)
                                                       .Include(x => x.IdToken)
+                                                      .Include(x => x.RefreshToken)
                                                       .Include(x => x.Authorization)
                                                       .Where(x => string.Equals(x.Token, token) && x.Status == Status.Valid)
                                                       .ToListAsync();
@@ -76,6 +78,7 @@ namespace AuthServer.Services
             {
                 await _tokenManager.TryRevokeAsync(item.AccessToken);
                 await _tokenManager.TryRevokeAsync(item.IdToken);
+                await _tokenManager.TryRevokeAsync(item.RefreshToken);
                 await _authorizationManager.TryRevokeAsync(item.Authorization);
                 item.Status = Status.Revoked;
             }
@@ -87,6 +90,7 @@ namespace AuthServer.Services
         {
             var tokenMaps = await _dbContext.TokenMaps.Include(x => x.AccessToken)
                                                       .Include(x => x.IdToken)
+                                                      .Include(x => x.RefreshToken)
                                                       .Include(x => x.Authorization)
                                                       .Where(x => x.Identifier == identifier && x.Status == Status.Valid)
                                                       .ToListAsync();
@@ -94,6 +98,7 @@ namespace AuthServer.Services
             {
                 await _tokenManager.TryRevokeAsync(item.AccessToken);
                 await _tokenManager.TryRevokeAsync(item.IdToken);
+                await _tokenManager.TryRevokeAsync(item.RefreshToken);
                 await _authorizationManager.TryRevokeAsync(item.Authorization);
                 item.Status = Status.Revoked;
             }

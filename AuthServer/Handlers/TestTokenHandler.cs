@@ -119,6 +119,7 @@ namespace AuthServer.Handlers
             {
                 CustomToken accessToken = null;
                 CustomToken idToken = null;
+                CustomToken refreshToken = null;
                 CustomAuthorization customAuthorization = null;
                 if (context == null)
                 {
@@ -166,6 +167,25 @@ namespace AuthServer.Handlers
                     }
                 }
 
+                if (context.IncludeRefreshToken)
+                {
+                    Debug.Assert(context.RefreshTokenPrincipal is { Identity: ClaimsIdentity }, "no Identity claims");
+
+                    // Extract identifier and store the token there
+                    var identifier = context.RefreshTokenPrincipal.GetTokenId();
+                    if (string.IsNullOrEmpty(identifier))
+                    {
+                        throw new InvalidOperationException("Identifier not found");
+                    }
+                    var token = await _openIddictTokenManager.FindByIdAsync(identifier, context.CancellationToken);
+                    if (token is CustomToken customToken)
+                    {
+                        customToken.Token = context.RefreshToken;
+                        refreshToken = customToken;
+                        await _openIddictTokenManager.UpdateAsync(customToken, context.CancellationToken);
+                    }
+                }
+
                 var identity = context.Principal.Identity as ClaimsIdentity;
                 var authId = identity?.GetAuthorizationId();
                 if (identity != null && authId != null)
@@ -184,10 +204,11 @@ namespace AuthServer.Handlers
                     {
                         var identifier = identity.GetClaim(Claims.Subject);
                         // Todo: generate your custom token
-                        var tokenMap = await _testTokenService.GenerateToken(identifier, accessToken, idToken, customAuthorization);
+                        var tokenMap = await _testTokenService.GenerateToken(identifier, accessToken, idToken, refreshToken, customAuthorization);
 
                         context.Transaction.Response.AccessToken = tokenMap.Token;
                         context.Transaction.Response.IdToken = null;
+                        context.Transaction.Response.RefreshToken = null;
                     }
                     catch (Exception ex)
                     {
@@ -251,6 +272,7 @@ namespace AuthServer.Handlers
                         {
                             context.Token = ct.Token;
                         }
+
                     }
                     catch (Exception ex)
                     {
@@ -259,6 +281,33 @@ namespace AuthServer.Handlers
                        error: Errors.InvalidRequest, ex.Message);
 
                         return ValueTask.CompletedTask;
+                    }
+                }
+                else if (context.ValidTokenTypes.Contains("refresh_token"))
+                {
+                    if (context.Request?.IsRefreshTokenGrantType() ?? false)
+                    {
+                        try
+                        {
+                            var isValid = _testTokenService.ValidateToken(context.Request.RefreshToken, out var tokenMap);
+                            if (!isValid)
+                            {
+                                context.Reject(
+                                 error: Errors.InvalidToken, "Invalid Token");
+
+                                return ValueTask.CompletedTask;
+                            }
+                            context.Request.RefreshToken = tokenMap.RefreshToken.Token;
+
+                        }
+                        catch (Exception ex)
+                        {
+                            context.Logger.LogError(ex.ToString());
+                            context.Reject(
+                           error: Errors.InvalidRequest, ex.Message);
+
+                            return ValueTask.CompletedTask;
+                        }
                     }
                 }
 

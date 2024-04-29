@@ -80,6 +80,7 @@ builder.Services.AddOpenIddict()
             options
                 .AllowClientCredentialsFlow();
             options.AllowAuthorizationCodeFlow().RequireProofKeyForCodeExchange();
+            options.AllowRefreshTokenFlow();
             options.SetAccessTokenLifetime(TimeSpan.FromMinutes(configuration.GetSection("TokenExpiration").Get<int>()));
 
             options
